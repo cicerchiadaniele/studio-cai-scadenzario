@@ -243,6 +243,15 @@ export function livello(voce, rif = oggi()) {
   return 'futuro'
 }
 
+// Lo scadenzario lavora solo sui condomini attivi: quelli dell'elenco (Registro Chiavi, sincronizzato
+// dalle cartelle Dropbox scritti_cai). Un condominio spostato in zVecchi Condomini sparisce da tutto.
+export function soloAttivi(dati) {
+  if (!dati.condomini?.length) return dati
+  const attivi = new Set(dati.condomini.map((c) => c.Condominio))
+  const f = (lista) => (lista || []).filter((r) => attivi.has(r.Condominio))
+  return { ...dati, scadenze: f(dati.scadenze), contratti: f(dati.contratti), immobili: f(dati.immobili) }
+}
+
 export function costruisciAgenda({ scadenze, contratti, immobili, aliquote, istat }, rif = oggi()) {
   const voci = []
   for (const s of scadenze) {
@@ -270,7 +279,13 @@ export const normalizza = (s) =>
 // Elenco dei dati da completare: voci senza data o da verificare, contratti "Da verificare", unità senza rendita
 export function datiMancanti(dati, agenda) {
   const out = agenda.filter((v) => v.livello === 'nd').map((v) => ({ ...v, sotto: v.sotto || (v.fonte === 'scadenza' ? 'Manca la data di scadenza' : v.sotto) }))
-  for (const c of dati.contratti) if (c.Stato === 'Da verificare') out.push({ chiave: `${c.id}-verifica`, condominio: c.Condominio, tipo: 'Locazione', titolo: `Contratto ${c.Conduttore}`, sotto: 'Contratto da verificare (in corso o cessato?)', fonte: 'contratto', ref: c.id, livello: 'nd' })
+  for (const c of dati.contratti) {
+    if (c.Stato === 'Da verificare') out.push({ chiave: `${c.id}-verifica`, condominio: c.Condominio, tipo: 'Locazione', titolo: `Contratto ${c.Conduttore}`, sotto: 'Contratto da verificare (in corso o cessato?)', fonte: 'contratto', ref: c.id, livello: 'nd' })
+    else if (c.Stato === 'Attivo') {
+      const manca = [!c.Decorrenza && 'decorrenza', !(Number(c['Canone attuale annuo']) || Number(c['Canone iniziale annuo'])) && 'canone'].filter(Boolean)
+      if (manca.length) out.push({ chiave: `${c.id}-dati`, condominio: c.Condominio, tipo: 'Locazione', titolo: `Contratto ${c.Conduttore}`, sotto: `Contratto in corso: manca ${manca.join(' e ')}`, fonte: 'contratto', ref: c.id, livello: 'nd' })
+    }
+  }
   for (const i of dati.immobili) if (!i['Rendita catastale'] && !i['Esente IMU']) out.push({ chiave: `${i.id}-rendita`, condominio: i.Condominio, tipo: 'Immobile', titolo: i.Denominazione, sotto: 'Manca la rendita catastale (serve la visura)', fonte: 'immobile', ref: i.id, livello: 'nd' })
   return out.sort((a, b) => a.condominio.localeCompare(b.condominio, 'it'))
 }

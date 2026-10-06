@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { caricaDati, leggiCache, cacheValida, scriviCache, crea, aggiorna, elimina } from './api.js'
-import { costruisciAgenda } from './calcoli.js'
+import { costruisciAgenda, soloAttivi } from './calcoli.js'
 import { Sfondo, Intestazione, PiePagina } from './components/Cornice.jsx'
 import Home from './components/Home.jsx'
 import Agenda from './components/Agenda.jsx'
@@ -32,7 +32,8 @@ export default function App() {
   // Lettura da Airtable solo se la cache del dispositivo è scaduta (risparmio di operazioni Make)
   useEffect(() => { if (!cacheValida(leggiCache())) ricarica() }, [ricarica])
 
-  const agenda = useMemo(() => costruisciAgenda(dati), [dati])
+  const visibili = useMemo(() => soloAttivi(dati), [dati])
+  const agenda = useMemo(() => costruisciAgenda(visibili), [visibili])
 
   const vai = (v, p) => { setPila((s) => [...s, { v, p }]); window.scrollTo?.({ top: 0 }) }
   const indietro = () => setPila((s) => (s.length > 1 ? s.slice(0, -1) : s))
@@ -58,7 +59,7 @@ export default function App() {
   }
 
   const corrente = pila[pila.length - 1]
-  const comune = { dati, agenda, vai, indietro, salva, cancella }
+  const comune = { dati: visibili, agenda, vai, indietro, salva, cancella }
 
   return (
     <div className="relative flex min-h-screen flex-col bg-paper bg-noise text-neutral-900">
