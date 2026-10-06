@@ -28,7 +28,7 @@ function TabellaIstat({ adeg }) {
   )
 }
 
-export default function SchedaContratto({ dati, id, salva, cancella, indietro, vai }) {
+export default function SchedaContratto({ dati, id, salva, cancella, indietro, vai, condominio }) {
   const c = id ? dati.contratti.find((x) => x.id === id) : null
   const [modifica, setModifica] = useState(!id)
   const [esito, setEsito] = useState('')
@@ -40,7 +40,7 @@ export default function SchedaContratto({ dati, id, salva, cancella, indietro, v
 
   const unita = c ? dati.immobili.find((i) => i.id === (c.Immobile || [])[0]) : null
   const schema = schemaContratto(dati.condomini, dati.immobili)
-  const iniziali = c ? { ...c, ImmobileId: unita?.Denominazione || '' } : { Stato: 'Attivo', ISTAT: '75%', 'Imposta di registro': 'Annuale' }
+  const iniziali = c ? { ...c, ImmobileId: unita?.Denominazione || '' } : { Stato: 'Attivo', ISTAT: '75%', 'Imposta di registro': 'Annuale', ...(condominio ? { Condominio: condominio, 'Dropbox ID': dati.condomini.find((c) => c.Condominio === condominio)?.['Dropbox ID'] || '' } : {}) }
 
   const onSalva = async (campi) => {
     const { ImmobileId, ...resto } = campi

@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { caricaDati, leggiCache, cacheValida, scriviCache, crea, aggiorna, elimina } from './api.js'
 import { costruisciAgenda, soloAttivi } from './calcoli.js'
 import { Sfondo, Intestazione, PiePagina } from './components/Cornice.jsx'
+import BarraCondominio from './components/BarraCondominio.jsx'
 import Home from './components/Home.jsx'
 import Agenda from './components/Agenda.jsx'
 import SchedaScadenza from './components/SchedaScadenza.jsx'
@@ -32,7 +33,20 @@ export default function App() {
   // Lettura da Airtable solo se la cache del dispositivo è scaduta (risparmio di operazioni Make)
   useEffect(() => { if (!cacheValida(leggiCache())) ricarica() }, [ricarica])
 
-  const visibili = useMemo(() => soloAttivi(dati), [dati])
+  // Filtro principale: il condominio scelto (ricordato sul dispositivo). Vuoto = tutti i condomini.
+  const [condominio, setCondominioStato] = useState(() => { try { return localStorage.getItem('scadenzario-condominio') || '' } catch { return '' } })
+  const setCondominio = (c) => {
+    setCondominioStato(c)
+    try { c ? localStorage.setItem('scadenzario-condominio', c) : localStorage.removeItem('scadenzario-condominio') } catch { /* niente */ }
+    setPila([{ v: 'home' }])
+    window.scrollTo?.({ top: 0 })
+  }
+  const attivi = useMemo(() => soloAttivi(dati), [dati])
+  const visibili = useMemo(() => {
+    if (!condominio) return attivi
+    const f = (l) => l.filter((r) => r.Condominio === condominio)
+    return { ...attivi, scadenze: f(attivi.scadenze), contratti: f(attivi.contratti), immobili: f(attivi.immobili) }
+  }, [attivi, condominio])
   const agenda = useMemo(() => costruisciAgenda(visibili), [visibili])
 
   const vai = (v, p) => { setPila((s) => [...s, { v, p }]); window.scrollTo?.({ top: 0 }) }
@@ -59,17 +73,18 @@ export default function App() {
   }
 
   const corrente = pila[pila.length - 1]
-  const comune = { dati: visibili, agenda, vai, indietro, salva, cancella }
+  const comune = { dati: visibili, agenda, condominio, vai, indietro, salva, cancella }
 
   return (
     <div className="relative flex min-h-screen flex-col bg-paper bg-noise text-neutral-900">
       <Sfondo />
       <Intestazione />
+      <BarraCondominio condomini={attivi.condomini} valore={condominio} onCambia={setCondominio} />
       <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pt-4 sm:pt-6">
         <AnimatePresence mode="wait">
           {corrente.v === 'home' && <Home key="home" {...comune} caricamento={caricamento} onRicarica={ricarica} />}
           {corrente.v === 'agenda' && <Agenda key={`agenda-${pila.length}`} {...comune} filtro={corrente.p} />}
-          {corrente.v === 'scadenza' && <SchedaScadenza key={`sc-${corrente.p?.id || 'nuova'}`} {...comune} id={corrente.p?.id} />}
+          {corrente.v === 'scadenza' && <SchedaScadenza key={`sc-${corrente.p?.id || 'nuova'}`} {...comune} id={corrente.p?.id} tipo={corrente.p?.tipo} />}
           {corrente.v === 'locazioni' && <Locazioni key="loc" {...comune} />}
           {corrente.v === 'contratto' && <SchedaContratto key={`co-${corrente.p?.id || 'nuovo'}`} {...comune} id={corrente.p?.id} />}
           {corrente.v === 'immobili' && <Immobili key="imm" {...comune} filtro={corrente.p} />}

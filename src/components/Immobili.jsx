@@ -1,23 +1,21 @@
 import { useMemo, useState } from 'react'
 import Schermata from './Schermata.jsx'
-import { Pill, Cerca, CAMPO, TASTO_SECONDARIO, Avviso } from './ui.jsx'
+import { Pill, Cerca, TASTO_SECONDARIO, Avviso } from './ui.jsx'
 import { imuImmobile, euro, oggi, normalizza, arrot } from '../calcoli.js'
 
 export function contrattiDi(dati, imId) {
   return dati.contratti.filter((c) => (c.Immobile || []).includes(imId))
 }
 
-export default function Immobili({ dati, vai, indietro, filtro }) {
+export default function Immobili({ dati, vai, indietro }) {
   const annoCorrente = oggi().getUTCFullYear()
   const [anno, setAnno] = useState(annoCorrente)
-  const [condominio, setCondominio] = useState(filtro?.condominio || '')
   const [q, setQ] = useState('')
 
   const gruppi = useMemo(() => {
     const n = normalizza(q)
     const m = new Map()
     for (const im of dati.immobili) {
-      if (condominio && im.Condominio !== condominio) continue
       if (n && !normalizza(`${im.Condominio} ${im.Denominazione}`).includes(n)) continue
       const imu = imuImmobile(im, contrattiDi(dati, im.id), dati.aliquote, anno)
       const g = m.get(im.Condominio) || { condominio: im.Condominio, righe: [], totale: 0, incomplete: 0 }
@@ -27,9 +25,8 @@ export default function Immobili({ dati, vai, indietro, filtro }) {
       m.set(im.Condominio, g)
     }
     return [...m.values()].sort((a, b) => a.condominio.localeCompare(b.condominio, 'it'))
-  }, [dati, anno, condominio, q])
+  }, [dati, anno, q])
 
-  const condomini = [...new Set(dati.immobili.map((i) => i.Condominio))].sort((a, b) => a.localeCompare(b, 'it'))
   const totale = gruppi.reduce((s, g) => s + g.totale, 0)
   const stimata = gruppi.some((g) => g.righe.some((r) => r.imu.aliquotaStimata))
 
@@ -38,13 +35,7 @@ export default function Immobili({ dati, vai, indietro, filtro }) {
       <div className="flex flex-wrap gap-2">
         {[annoCorrente, annoCorrente + 1].map((a) => <Pill key={a} attivo={anno === a} onClick={() => setAnno(a)}>IMU {a}</Pill>)}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <select value={condominio} onChange={(e) => setCondominio(e.target.value)} className={CAMPO} aria-label="Condominio">
-          <option value="">Tutti i condomini</option>
-          {condomini.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <Cerca valore={q} onChange={setQ} placeholder="Cerca unità" />
-      </div>
+      <div className="mt-3"><Cerca valore={q} onChange={setQ} placeholder="Cerca unità" /></div>
       <p className="mt-3 text-sm text-neutral-600">IMU {anno} calcolata: <strong>{euro(arrot(totale))}</strong> (acconto 16/06 e saldo 16/12, metà ciascuno)</p>
       {stimata && <div className="mt-3"><Avviso tipo="attenzione">Aliquote {anno} non ancora inserite: uso quelle dell’ultimo anno disponibile. Aggiornale in “Indici e aliquote”.</Avviso></div>}
 

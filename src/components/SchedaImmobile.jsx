@@ -20,7 +20,7 @@ function CalcoloImu({ calc }) {
   )
 }
 
-export default function SchedaImmobile({ dati, id, salva, cancella, indietro, vai }) {
+export default function SchedaImmobile({ dati, id, salva, cancella, indietro, vai, condominio }) {
   const im = id ? dati.immobili.find((x) => x.id === id) : null
   const [modifica, setModifica] = useState(!id)
   const [esito, setEsito] = useState('')
@@ -37,7 +37,7 @@ export default function SchedaImmobile({ dati, id, salva, cancella, indietro, va
   if (!im) {
     return (
       <Schermata titolo="Nuova unità" onIndietro={indietro}>
-        <Modulo schema={schema} iniziali={{ Stato: 'Libero', Tipologia: 'Appartamento' }} onSalva={onSalva} etichettaSalva="Crea unità" onAnnulla={indietro} />
+        <Modulo schema={schema} iniziali={{ Stato: 'Libero', Tipologia: 'Appartamento', ...(condominio ? { Condominio: condominio, 'Dropbox ID': dati.condomini.find((c) => c.Condominio === condominio)?.['Dropbox ID'] || '' } : {}) }} onSalva={onSalva} etichettaSalva="Crea unità" onAnnulla={indietro} />
       </Schermata>
     )
   }

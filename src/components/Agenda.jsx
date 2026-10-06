@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
 import Schermata from './Schermata.jsx'
-import { BadgeLivello, Pill, Cerca, CAMPO, TASTO_SECONDARIO } from './ui.jsx'
+import { BadgeLivello, Pill, Cerca, TASTO_SECONDARIO } from './ui.jsx'
 import { d, fmtData, giorniTra, oggi, normalizza, addMesi, datiMancanti } from '../calcoli.js'
+import { AREE, areaDi } from '../config.js'
 
 const GRUPPI = {
   tutte: { nome: 'Tutte', test: () => true },
-  impianti: { nome: 'CPI e verifiche', test: (v) => ['CPI', 'Ascensore – verifica biennale', 'Impianto di terra (DPR 462/01)', 'Impianto termico'].includes(v.tipo) },
-  locazioni: { nome: 'Locazioni', test: (v) => v.tipo.startsWith('Locazione') },
-  imu: { nome: 'IMU', test: (v) => v.tipo === 'IMU' },
-  altro: { nome: 'Altro', test: (v) => ['Sicurezza portieri', 'Contratto fornitore', 'APE', 'Altro'].includes(v.tipo) },
+  ...Object.fromEntries(AREE.map((a) => [a.k, { nome: a.nome, test: (v) => areaDi(v.tipo || '') === a.k }])),
 }
 const LIVELLI = {
   gestire: { nome: 'Da gestire', test: (v) => v.stato !== 'Fatto' && (v.livello === 'scaduto' || v.livello === 'imminente') },
@@ -29,7 +27,7 @@ function quando(voce, rif) {
   return -g < 60 ? `${-g} giorni fa` : `${Math.round(-g / 30)} mesi fa`
 }
 
-export function RigaVoce({ voce, onApri }) {
+export function RigaVoce({ voce, onApri, senzaCondominio }) {
   const rif = oggi()
   return (
     <li>
@@ -40,7 +38,7 @@ export function RigaVoce({ voce, onApri }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-neutral-500">{voce.condominio}</p>
+            <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-neutral-500">{senzaCondominio ? '' : voce.condominio}</p>
             <BadgeLivello livello={voce.livello}>{voce.livello === 'nd' ? 'Da completare' : voce.stato === 'Fatto' ? 'Fatta' : quando(voce, rif)}</BadgeLivello>
           </div>
           <p className="mt-0.5 font-semibold leading-snug">{voce.titolo}</p>
@@ -59,52 +57,45 @@ export function apriVoce(voce, vai) {
   else if (voce.fonte === 'imu') vai('immobili', { condominio: voce.condominio })
 }
 
-export default function Agenda({ dati, agenda, vai, indietro, filtro }) {
-  const [gruppo, setGruppo] = useState(filtro?.gruppo || 'tutte')
+export default function Agenda({ dati, agenda, vai, indietro, filtro, condominio: condSel }) {
+  const [gruppo, setGruppo] = useState(GRUPPI[filtro?.gruppo] ? filtro.gruppo : 'tutte')
   const [livello, setLivello] = useState(filtro?.livello || 'gestire')
-  const [condominio, setCondominio] = useState(filtro?.condominio || '')
   const [q, setQ] = useState('')
   const rif = oggi()
 
-  const condomini = useMemo(() => [...new Set(agenda.map((v) => v.condominio))].sort((a, b) => a.localeCompare(b, 'it')), [agenda])
   const base = useMemo(() => {
     const n = normalizza(q)
     return agenda.filter((v) =>
       GRUPPI[gruppo].test(v) &&
-      (!condominio || v.condominio === condominio) &&
       (!n || normalizza(`${v.condominio} ${v.titolo} ${v.sotto || ''}`).includes(n)))
-  }, [agenda, gruppo, condominio, q])
+  }, [agenda, gruppo, q])
   const voci = base.filter((v) => LIVELLI[livello].test(v, rif))
 
   // Dati mancanti: scadenze senza data, ISTAT da verificare, contratti da verificare, unità senza rendita
   const mancanti = useMemo(() => {
     if (livello !== 'nd') return []
     const n = normalizza(q)
-    return datiMancanti(dati, agenda).filter((v) => GRUPPI[gruppo].test({ tipo: v.tipo || '' }) || gruppo === 'tutte')
-      .filter((v) => (!condominio || v.condominio === condominio) && (!n || normalizza(`${v.condominio} ${v.titolo}`).includes(n)))
-  }, [livello, dati, agenda, condominio, q, gruppo])
+    return datiMancanti(dati, agenda).filter((v) => gruppo === 'tutte' || GRUPPI[gruppo].test({ tipo: v.tipo || '' }))
+      .filter((v) => !n || normalizza(`${v.condominio} ${v.titolo}`).includes(n))
+  }, [livello, dati, agenda, q, gruppo])
 
   const elenco = livello === 'nd' ? mancanti : voci
   const conta = (k) => (k === 'nd' ? undefined : base.filter((v) => LIVELLI[k].test(v, rif)).length)
 
   return (
-    <Schermata titolo="Scadenze" sotto="Scadenze periodiche, locazioni e IMU di tutti i condomini" onIndietro={indietro}>
+    <Schermata titolo="Scadenze" sotto={condSel ? `Tutte le scadenze di ${condSel}` : 'Scadenze periodiche, locazioni e IMU di tutti i condomini'} onIndietro={indietro}>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {Object.entries(LIVELLI).map(([k, l]) => <Pill key={k} attivo={livello === k} onClick={() => setLivello(k)} conteggio={conta(k)}>{l.nome}</Pill>)}
       </div>
       <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
         {Object.entries(GRUPPI).map(([k, g]) => <Pill key={k} attivo={gruppo === k} onClick={() => setGruppo(k)}>{g.nome}</Pill>)}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <select value={condominio} onChange={(e) => setCondominio(e.target.value)} className={CAMPO} aria-label="Condominio">
-          <option value="">Tutti i condomini</option>
-          {condomini.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <Cerca valore={q} onChange={setQ} placeholder="Cerca (descrizione, conduttore…)" />
+      <div className="mt-3">
+        <Cerca valore={q} onChange={setQ} placeholder={condSel ? 'Cerca (descrizione, conduttore…)' : 'Cerca (condominio, descrizione, conduttore…)'} />
       </div>
 
       <ul className="mt-4 flex flex-col gap-2">
-        {elenco.map((v) => <RigaVoce key={v.chiave} voce={v} onApri={(x) => apriVoce(x, vai)} />)}
+        {elenco.map((v) => <RigaVoce key={v.chiave} voce={v} senzaCondominio={!!condSel} onApri={(x) => apriVoce(x, vai)} />)}
       </ul>
       {elenco.length === 0 && <p className="mt-6 text-center text-neutral-500">Nessuna scadenza con questi filtri.</p>}
 

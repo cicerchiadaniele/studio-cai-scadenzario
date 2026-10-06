@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Schermata from './Schermata.jsx'
 import { Modulo, Avviso, Sezione, CAMPO, TASTO_PRIMARIO, TASTO_PICCOLO, BadgeLivello } from './ui.jsx'
 import { schemaScadenza } from '../schemi.js'
+import { DEFAULT_TIPO } from '../config.js'
 import { addMesi, d, fmtData, iso, oggi, livello } from '../calcoli.js'
 
 // Chiusura di una scadenza: la segna "Fatto" e, se periodica, crea la successiva a partire dalla data dell'adempimento.
@@ -41,14 +42,20 @@ function ChiudiScadenza({ s, salva, onFatto }) {
   )
 }
 
-export default function SchedaScadenza({ dati, id, salva, cancella, indietro }) {
+export default function SchedaScadenza({ dati, id, salva, cancella, indietro, condominio, tipo }) {
   const s = id ? dati.scadenze.find((x) => x.id === id) : null
   const [esito, setEsito] = useState('')
   const [conferma, setConferma] = useState(false)
   if (id && !s) return <Schermata titolo="Scadenza" onIndietro={indietro}><Avviso tipo="attenzione">Scadenza non trovata (forse eliminata).</Avviso></Schermata>
 
   const schema = schemaScadenza(dati.condomini)
-  const iniziali = s ? { ...s } : { Stato: 'Da fare', 'Preavviso (giorni)': 30 }
+  const dbx = dati.condomini.find((c) => c.Condominio === condominio)?.['Dropbox ID']
+  const pred = tipo ? DEFAULT_TIPO[tipo] : null
+  const iniziali = s ? { ...s } : {
+    Stato: 'Da fare', 'Preavviso (giorni)': pred?.preavviso ?? 30,
+    ...(tipo ? { Tipo: tipo, 'Periodicità (mesi)': pred?.periodicita } : {}),
+    ...(condominio ? { Condominio: condominio, 'Dropbox ID': dbx || '' } : {}),
+  }
   const onSalva = async (campi) => {
     await salva('scadenze', s?.id || null, campi)
     if (!s) indietro()

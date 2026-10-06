@@ -1,6 +1,6 @@
 // Webhook Make: scenario "Studio CAI – WebApp Scadenzario" (ID 7808867, hook 3853601)
 export const WEBHOOK_URL = 'https://hook.eu1.make.com/dq5r421i3uo1kt75r51m3vnq7lz0dlpj'
-export const APP_VERSION = '1.1.0'
+export const APP_VERSION = '1.2.0'
 export const BUILD_DATE = '06/10/2026'
 export const TIMEOUT_MS = 30000
 
@@ -23,6 +23,7 @@ export const TIPI_SCADENZA = [
   'CPI',
   'Ascensore – verifica biennale',
   'Impianto di terra (DPR 462/01)',
+  'Analisi acqua (potabilità/legionella)',
   'Impianto termico',
   'Sicurezza portieri',
   'Contratto fornitore',
@@ -34,7 +35,8 @@ export const TIPI_SCADENZA = [
 export const DEFAULT_TIPO = {
   CPI: { periodicita: 60, preavviso: 90 },
   'Ascensore – verifica biennale': { periodicita: 24, preavviso: 60 },
-  'Impianto di terra (DPR 462/01)': { periodicita: 60, preavviso: 60 },
+  'Impianto di terra (DPR 462/01)': { periodicita: 24, preavviso: 60 },
+  'Analisi acqua (potabilità/legionella)': { periodicita: 12, preavviso: 30 },
   'Impianto termico': { periodicita: 12, preavviso: 30 },
   'Sicurezza portieri': { periodicita: 12, preavviso: 30 },
   'Contratto fornitore': { periodicita: 12, preavviso: 90 },
@@ -63,3 +65,15 @@ export const STATI_IMMOBILE = ['Locato', 'Libero', 'In uso al portiere', 'NON DI
 export const STATI_CONTRATTO = ['Attivo', 'Da verificare', 'Cessato']
 export const STATI_SCADENZA = ['Da fare', 'In corso', 'Fatto', 'NON DISPONIBILE']
 export const ND = 'NON DISPONIBILE'
+
+// Aree dello scadenzario: guidano i filtri dell'agenda e la scheda del singolo condominio
+export const AREE = [
+  { k: 'cpi', nome: 'CPI e antincendio', icona: 'fuoco', tipi: ['CPI'] },
+  { k: 'ascensori', nome: 'Ascensori', icona: 'ascensore', tipi: ['Ascensore – verifica biennale'] },
+  { k: 'terra', nome: 'Messa a terra', icona: 'fulmine', tipi: ['Impianto di terra (DPR 462/01)'] },
+  { k: 'acqua', nome: 'Acqua', icona: 'goccia', tipi: ['Analisi acqua (potabilità/legionella)'] },
+  { k: 'locazioni', nome: 'Locazioni', icona: 'chiave', prefisso: 'Locazione' },
+  { k: 'imu', nome: 'IMU', icona: 'casa', tipi: ['IMU'] },
+  { k: 'altro', nome: 'Altro', icona: 'agenda', tipi: ['Impianto termico', 'Sicurezza portieri', 'Contratto fornitore', 'APE', 'Altro'] },
+]
+export const areaDi = (tipo = '') => AREE.find((a) => (a.prefisso ? tipo.startsWith(a.prefisso) : a.tipi.includes(tipo)))?.k || 'altro'
