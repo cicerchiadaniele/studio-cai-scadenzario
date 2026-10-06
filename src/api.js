@@ -1,6 +1,6 @@
 import { WEBHOOK_URL, TIMEOUT_MS, APP_VERSION, CACHE_ORE } from './config.js'
 
-const CHIAVE_CACHE = 'scadenzario:dati:v1'
+const CHIAVE_CACHE = 'scadenzario:dati:v2'
 
 // Invio come form-urlencoded: richiesta "semplice", nessun preflight CORS.
 async function chiama(dati) {
@@ -29,12 +29,23 @@ async function chiama(dati) {
 // Record Airtable -> oggetto piatto { id, ...campi }
 const piatto = (r) => ({ id: r.id, ...(r.fields || {}) })
 
+// Se l'elenco condomini non arriva, lo ricavo dai dati stessi (nome e cartella Dropbox)
+function condominiDaiDati(...liste) {
+  const m = new Map()
+  for (const l of liste) for (const r of l) if (r.Condominio && !m.has(r.Condominio)) m.set(r.Condominio, { id: r.Condominio, Condominio: r.Condominio, 'Dropbox ID': r['Dropbox ID'] || '' })
+  return [...m.values()]
+}
+
 function normalizzaDati(json) {
+  const immobili = (json.immobili || []).map(piatto)
+  const contratti = (json.contratti || []).map(piatto)
+  const scadenze = (json.scadenze || []).map(piatto)
+  const elenco = (json.condomini || []).map(piatto).filter((c) => c.Condominio)
   return {
-    condomini: (json.condomini || []).map(piatto).filter((c) => c.Condominio),
-    immobili: (json.immobili || []).map(piatto),
-    contratti: (json.contratti || []).map(piatto),
-    scadenze: (json.scadenze || []).map(piatto),
+    condomini: elenco.length ? elenco : condominiDaiDati(scadenze, contratti, immobili),
+    immobili,
+    contratti,
+    scadenze,
     aliquote: (json.aliquote || []).map(piatto),
     istat: (json.istat || []).map(piatto),
     incompleto: json.incompleto === true,
@@ -53,12 +64,17 @@ export function leggiCache() {
 export function scriviCache(dati) {
   try { localStorage.setItem(CHIAVE_CACHE, JSON.stringify(dati)) } catch { /* facoltativo */ }
 }
-export const cacheValida = (dati) => !!dati && Date.now() - new Date(dati.letto).getTime() < CACHE_ORE * 3600000
+export const cacheValida = (dati) => !!dati && dati.condomini?.length > 0 && Date.now() - new Date(dati.letto).getTime() < CACHE_ORE * 3600000
 
-export async function caricaDati() {
-  const dati = normalizzaDati(await chiama({ azione: 'elenco' }))
-  scriviCache(dati)
-  return dati
+// Una sola lettura alla volta: richieste ravvicinate riusano quella in corso (risparmio operazioni Make)
+let letturaInCorso = null
+export function caricaDati() {
+  if (!letturaInCorso) {
+    letturaInCorso = chiama({ azione: 'elenco' })
+      .then((json) => { const dati = normalizzaDati(json); scriviCache(dati); return dati })
+      .finally(() => { letturaInCorso = null })
+  }
+  return letturaInCorso
 }
 
 // Rimuove i campi calcolati o di sola lettura prima di scrivere su Airtable

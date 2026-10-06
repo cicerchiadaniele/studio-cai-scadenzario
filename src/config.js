@@ -1,7 +1,7 @@
 // Webhook Make: scenario "Studio CAI – WebApp Scadenzario" (ID 7808867, hook 3853601)
 export const WEBHOOK_URL = 'https://hook.eu1.make.com/dq5r421i3uo1kt75r51m3vnq7lz0dlpj'
-export const APP_VERSION = '1.2.0'
-export const BUILD_DATE = '06/10/2026'
+export const APP_VERSION = '1.2.1'
+export const BUILD_DATE = '07/10/2026'
 export const TIMEOUT_MS = 30000
 
 // I dati restano in cache sul dispositivo per CACHE_ORE: ogni lettura da Airtable costa ~13 operazioni Make.
